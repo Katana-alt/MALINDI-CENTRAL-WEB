@@ -1,0 +1,24 @@
+{
+  "name": "Takaye Comprehensive School",
+  "short_name": "Takaye School",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#025464",
+  "description": "CBC Grading App for Takaye Comprehensive School. Track, grade, and report learner performance easily offline. Simplifying grading, tracking, and reporting for the school community.",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Learner Marks Entry - MALINDI CENTRAL COMPREHENSIVE SCHOOL</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f0f4f8;
+  }
+  h1 {
+    color: #0b3d91;
+    text-align: center;
+    font-weight: 900;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+  }
+  form, table {
+    max-width: 1000px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
+  }
+  form label {
+    display: inline-block;
+    margin: 8px 12px 8px 0;
+    font-weight: bold;
+  }
+  form input[type="text"], form select, form input[type="number"] {
+    padding: 6px 8px;
+    font-size: 1rem;
+    margin-right: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  form input[type="number"] {
+    width: 70px;
+  }
+  form button {
+    background-color: #0b3d91;
+    color: white;
+    padding: 10px 20px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  form button:hover {
+    background-color: #06407b;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  th {
+    background-color: #0b3d91;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  tbody tr:nth-child(even) {
+    background: #f9f9f9;
+  }
+  button.action-btn {
+    background-color: #0b3d91;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    margin: 2px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button.action-btn:hover {
+    background-color: #06407b;
+  }
+  #filters {
+    max-width: 1000px;
+    margin: 10px auto 0;
+    display: flex;
+    justify-content: flex-start;
+    gap: 15px;
+  }
+  #filters select {
+    padding: 6px 8px;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  #export-excel {
+    margin: 20px auto;
+    display: block;
+  }
+  #subjects label {
+    display: inline-block;
+    margin: 5px 15px 5px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>MALINDI CENTRAL COMPREHENSIVE SCHOOL - Learner Marks Entry</h1>
+
+<form id="addForm">
+  <label for="name">Learner Name:</label>
+  <input type="text" id="name" name="name" placeholder="Full Name" required autocomplete="off" />
+
+  <label for="grade">Grade:</label>
+  <select id="grade" name="grade" required></select>
+
+  <label for="stream">Stream:</label>
+  <select id="stream" name="stream" required></select>
+
+  <div id="subjects"></div>
+
+  <button type="submit">Save Learner Marks</button>
+</form>
+
+<div id="filters">
+  <label for="filter-grade">Filter Grade:</label>
+  <select id="filter-grade"><option value="">All Grades</option></select>
+
+  <label for="filter-stream">Filter Stream:</label>
+  <select id="filter-stream"><option value="">All Streams</option></select>
+</div>
+
+<table>
+  <thead>
+    <tr id="table-headers"></tr>
+  </thead>
+  <tbody id="students"></tbody>
+  <tfoot id="average-row"></tfoot>
+</table>
+
+<button id="export-excel">Export to Excel</button>
+
+<!-- XLSX library -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+  // (Insert the entire JavaScript code I gave you earlier here)
+  
+  const subjectsAll = [
+    "English", "Kiswahili", "Mathematics", "Science",
+    "Agrinutrition", "Social Studies", "Religious Education", 
+    "Pre-technical Studies", "Creative Arts", "Environmental"
+  ];
+
+  const grading = score => score >= 80 ? "EE" : score >= 60 ? "ME" : score >= 40 ? "AE" : "BE";
+
+  const gradeEl = document.getElementById("grade");
+  const streamEl = document.getElementById("stream");
+  const subjectsEl = document.getElementById("subjects");
+  const tableHeaders = document.getElementById("table-headers");
+  const studentsEl = document.getElementById("students");
+  const filterGradeEl = document.getElementById("filter-grade");
+  const filterStreamEl = document.getElementById("filter-stream");
+
+  const gradeOptions = Array.from({ length: 9 }, (_, i) => i + 1);
+  const streamsMap = { 
+    lower: ["B", "Y", "G"], 
+    upper: ["N", "S", "E", "W"] 
+  };
+
+  let editId = null;
+
+  gradeOptions.forEach(g => {
+    let opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = `Grade ${g}`;
+    gradeEl.appendChild(opt);
+    filterGradeEl.appendChild(opt.cloneNode(true));
+  });
+
+  gradeEl.addEventListener("change", updateSubjects);
+  filterGradeEl.addEventListener("change", displayLearners);
+  filterStreamEl.addEventListener("change", displayLearners);
+
+  function updateSubjects() {
+    streamEl.innerHTML = "";
+    const grade = parseInt(gradeEl.value);
+    const streams = grade <= 6 ? streamsMap.lower : streamsMap.upper;
+    streams.forEach(s => {
+      let opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      streamEl.appendChild(opt);
+    });
+
+    subjectsEl.innerHTML = "";
+    let activeSubjects = [];
+    if (grade >= 1 && grade <= 3) {
+      activeSubjects = ["English", "Mathematics", "Kiswahili", "Environmental", "Creative Arts"];
+    } else if (grade >= 4 && grade <= 6) {
+      activeSubjects = ["English", "Mathematics", "Kiswahili", "Science", "Creative Arts", "Agrinutrition", "Social Studies", "Religious Education"];
+    } else if (grade >= 7 && grade <= 9) {
+      activeSubjects = ["English", "Mathematics", "Kiswahili", "Science", "Social Studies", "Religious Education", "Pre-technical Studies", "Creative Arts", "Agrinutrition"];
+    }
+
+    activeSubjects.forEach(sub => {
+      const label = document.createElement("label");
+      label.innerHTML = `${sub}: <input type="number" name="${sub}" min="0" max="100" required>`;
+      subjectsEl.appendChild(label);
+    });
+  }
+
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const form = e.target;
+    const name = form.name.value.trim();
+    const grade = gradeEl.value;
+    const stream = streamEl.value;
+    const inputs = subjectsEl.querySelectorAll("input");
+    const scores = {};
+    inputs.forEach(i => scores[i.name] = parseInt(i.value));
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    const average = Math.round(total / Object.keys(scores).length);
+
+    let list = JSON.parse(localStorage.getItem("learners") || "[]");
+
+    if (editId) {
+      list = list.map(l => l.id === editId ? { ...l, name, grade, stream, scores, total, average } : l);
+      editId = null;
+    } else {
+      const id = Date.now();
+      list.push({ id, name, grade, stream, scores, total, average });
+    }
+
+    localStorage.setItem("learners", JSON.stringify(list));
+    form.reset();
+    subjectsEl.innerHTML = "";
+    displayLearners();
+  });
+
+  function displayLearners() {
+    let list = getFilteredLearners();
+    const headers = ["#", "Name", "Grade", "Stream", ...subjectsAll.map(s => `${s} (Mark/Grade)`), "Total", "Average", "Rank", "Actions"];
+    tableHeaders.innerHTML = headers.map(h => `<th>${h}</th>`).join("");
+    studentsEl.innerHTML = "";
+
+    let subjectAverages = new Array(subjectsAll.length).fill(0);
+    let gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
+
+    list.forEach((l, i) => {
+      const subCols = subjectsAll.map((s, idx) => {
+        const mark = l.scores[s];
+        if (mark !== undefined) {
+          subjectAverages[idx] += mark;
+          gradeCounts[grading(mark)]++;
+          return `<td>${mark} / ${grading(mark)}</td>`;
+        } else return "<td></td>";
+      });
+
+      studentsEl.innerHTML += `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${l.name}</td>
+          <td>${l.grade}</td>
+          <td>${l.stream}</td>
+          ${subCols.join("")}
+          <td>${l.total}</td>
+          <td>${l.average}</td>
+          <td>${l.rank || ""}</td>
+          <td>
+            <button class="action-btn" onclick="editLearner(${l.id})">Edit</button>
+            <button class="action-btn" onclick="deleteLearner(${l.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    if (list.length > 0) {
+      subjectAverages = subjectAverages.map(a => (a / list.length).toFixed(2));
+      const avgRow = document.getElementById("average-row");
+      avgRow.innerHTML = `
+        <tr>
+          <td colspan="4"><strong>Averages</strong></td>
+          ${subjectAverages.map(avg => `<td>${avg}</td>`).join("")}
+          <td colspan="5"></td>
+        </tr>
+        <tr>
+          <td colspan="4"><strong>Summary</strong></td>
+          <td>EE: ${gradeCounts.EE}</td>
+          <td>ME: ${gradeCounts.ME}</td>
+          <td>AE: ${gradeCounts.AE}</td>
+          <td>BE: ${gradeCounts.BE}</td>
+          <td colspan="3"></td>
+        </tr>
+      `;
+    }
+  }
+
+  function getFilteredLearners() {
+    const filterGrade = filterGradeEl.value;
+    const filterStream = filterStreamEl.value;
+    let list = JSON.parse(localStorage.getItem("learners") || "[]");
+
+    if (filterGrade) list = list.filter(l => l.grade === filterGrade);
+    if (filterStream) list = list.filter(l => l.stream === filterStream);
+
+    // Rank learners by total (descending)
+    list.sort((a, b) => b.total - a.total);
+    list.forEach((l, i) => l.rank = i + 1);
+
+    return list;
+  }
+
+  function editLearner(id) {
+    const learners = JSON.parse(localStorage.getItem("learners") || "[]");
+    const learner = learners.find(l => l.id === id);
+    if (!learner) return;
+
+    editId = id;
+    document.getElementById("name").value = learner.name;
+    gradeEl.value = learner.grade;
+    updateSubjects();
+    streamEl.value = learner.stream;
+
+    // Set marks
+    for (const [subject, mark] of Object.entries(learner.scores)) {
+      const input = subjectsEl.querySelector(`input[name="${subject}"]`);
+      if (input) input.value = mark;
+    }
+  }
+
+  function deleteLearner(id) {
+    if (!confirm("Are you sure you want to delete this learner?")) return;
+    let list = JSON.parse(localStorage.getItem("learners") || "[]");
+    list = list.filter(l => l.id !== id);
+    localStorage.setItem("learners", JSON.stringify(list));
+    displayLearners();
+  }
+
+  document.getElementById("export-excel").addEventListener("click", () => {
+    let list = getFilteredLearners();
+    if (list.length === 0) {
+      alert("No learners to export!");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+
+    // Header row
+    const headers = ["Name", "Grade", "Stream", ...subjectsAll, "Total", "Average", "Rank"];
+    wsData.push(headers);
+
+    list.forEach(l => {
+      const row = [
+        l.name,
+        l.grade,
+        l.stream,
+        ...subjectsAll.map(s => l.scores[s] !== undefined ? l.scores[s] : ""),
+        l.total,
+        l.average,
+        l.rank
+      ];
+      wsData.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Learners");
+    XLSX.writeFile(wb, `TAKAYE_School_Learners_${new Date().toISOString().slice(0,10)}.xlsx`);
+  });
+
+  // PRELOAD LEARNERS NAMES IF NONE EXISTS
+  (function preloadLearners() {
+    if (localStorage.getItem("learners")) return;
+
+    const names = [
+      "Alex Gowe","Amani Munga","Amani Nicholus","Betty Kenga","Constance Mbodze",
+      "Damaris Meja","Daniel Mkare","Dennis Yaa","Elkana Kiti","Elvina Safari",
+      "Esha Luvuno","Faith Amina","Faith Karisa","Fenny Anzazi","Gladys Tatu",
+      "Hassan Gilbert","Ibrahim Amani","James Rama","Janice Laura","Joan Pendo",
+      "Joseph Clinton","Joseph Karisa","Karembo Karisa","Kelvin Katana","Kelvin Samson",
+      "Latifa Kanze","Laurine Dama","Lavenda Nekesa","Lavenda Safari","Leloy Siron",
+      "Lucky Baraka","Lucy Dhahabu","Luiza Kingi","Lukuman Tunje","Marco Ruwa",
+      "Margaret Furaha","Markson Tsori","Marylina William","Maureen Mahenzo","Merylina Benson",
+      "Michael Baya","Millicent Kadzo","Morris Mwambire","Nelly Kadzo","Nelly Mahenzo",
+      "Pauline Zawadi","Pendo Bidii Diyo","Purity Syekonyo","Reymond Masha","Samuel Kazungu",
+      "Shadrack Kazungu","Sharlet Charo","Sharon Imani","Shukran Rashid","Sifa Clement",
+      "Stella Festus","Steve Kombe","Unda Charo Alfred","Vema Kwekwe","Wilson Mwaponda",
+      "Yvonne Simon","Zacharia Njuguna"
+    ];
+
+    const learners = names.map(name => ({
+      id: Date.now() + Math.random(),
+      name,
+      grade: "1",
+      stream: "B",
+      scores: {},
+      total: 0,
+      average: 0,
+      rank: 0,
+    }));
+
+    localStorage.setItem("learners", JSON.stringify(learners));
+  })();
+
+  // Initialize
+  gradeEl.value = "1";
+  updateSubjects();
+  displayLearners();
+
+</script>
+</body>
+</html>
